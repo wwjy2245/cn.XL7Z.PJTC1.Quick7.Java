@@ -1,0 +1,80 @@
+package XL7Z.PJTC1.Quick7.Java.UI.AWT.Event;
+
+import java.awt.event.MouseEvent;
+
+/**
+ * 一个新的MouseAdapter，支持了双击【无论是Swing还是SWT的MouseAdapter对双击的支持都挺那什么的，一赌气自己弄了一个】
+ * 
+ * @author 泽远
+ * @version 1.0
+ */
+public class MouseAdapter extends java.awt.event.MouseAdapter {
+	private int X_LastClick = 0, Y_LastClick = 0, X_ThisClick = 0, Y_ThisClick = 0;
+	private Long Time_LastClick = (long) 0, Time_ThisClick = (long) 0;
+	int ClickBias = 5, TimeSpan = 350;
+
+	/**
+	 * 提供一个偏移容差，忽略双击用力时造成的鼠标移动以关照某些鱼唇的地球人与隔壁脑血栓的吴老二
+	 * 
+	 * @param ClickBias
+	 *            允许的偏差【单位是px】
+	 * @param TimeSpan
+	 *            允许的时间差【单位是毫秒】
+	 */
+	public void Set_DoubleClickThreshold(int ClickBias, int TimeSpan) {
+		this.ClickBias = ClickBias;
+		this.TimeSpan = TimeSpan;
+	}
+
+	/**
+	 * 默认的单机事件会触发双击检测，如果覆写，请super一下IsItDoubleClick()！
+	 */
+	@Override
+	public void mouseClicked(MouseEvent e) {
+		IsItDoubleClick(e);
+	};
+
+	/**
+	 * 双击检测
+	 */
+	protected void IsItDoubleClick(MouseEvent e) {
+		X_LastClick = X_ThisClick;
+		Y_LastClick = Y_ThisClick;
+		Time_LastClick = Time_ThisClick;
+		X_ThisClick = e.getX();
+		Y_ThisClick = e.getY();
+		Time_ThisClick = System.currentTimeMillis();
+		if (Math.abs(X_ThisClick - X_LastClick) < ClickBias && Math.abs(Y_ThisClick - Y_LastClick) < ClickBias) {
+			if (Time_ThisClick - Time_LastClick < TimeSpan) {
+				mouseDoubleClicked(e);
+			}
+		}
+	}
+
+	/**
+	 * 加了对点击的数据显示，可以用于分析与调整上面Set_DoubleClickThreshold应该怎么设，愚蠢的泽远喵【作者wwjy2245】DeBug时剩下的东西
+	 */
+	protected void IsItDoubleClick_Debug(MouseEvent e) {
+		X_LastClick = X_ThisClick;
+		Y_LastClick = Y_ThisClick;
+		Time_LastClick = Time_ThisClick;
+		X_ThisClick = e.getX();
+		Y_ThisClick = e.getY();
+		Time_ThisClick = System.currentTimeMillis();
+		System.out.println("X漂移：" + (X_ThisClick - X_LastClick));
+		System.out.println("Y漂移：" + (Y_ThisClick - Y_LastClick));
+		System.out.println("耗时：" + (Time_ThisClick - Time_LastClick) + "ms");
+		if (Math.abs(X_ThisClick - X_LastClick) < ClickBias && Math.abs(Y_ThisClick - Y_LastClick) < ClickBias) {
+			if (Time_ThisClick - Time_LastClick < TimeSpan) {
+				System.out.println("触发双击判定！");
+				mouseDoubleClicked(e);
+			}
+		}
+	}
+
+	/**
+	 * 萌萌哒等待被触发的双击事件
+	 */
+	protected void mouseDoubleClicked(MouseEvent e) {
+	}
+};
