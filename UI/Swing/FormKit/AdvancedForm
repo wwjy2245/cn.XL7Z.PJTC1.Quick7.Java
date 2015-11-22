@@ -1,0 +1,246 @@
+package XL7Z.PJTC1.Quick7.Java.UI.Swing.FormKit;
+
+import java.awt.Dimension;
+import java.awt.Insets;
+import java.awt.Toolkit;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+
+import XL7Z.PJTC1.Quick7.Java.UI.AWT.Event.MouseAdapter;
+
+/**
+ * 高级窗体插件，提供了自定义窗体的伪最大最小化功能，适用于无边框无标题栏的DIY窗体
+ * 使用方法：在构造函数中直接把欲实现功能的窗体传进去即可，建议把自制的“标题栏”也传进去，这样可以提供拖动支持
+ * 
+ * @author 泽远
+ * @version 0.5
+ */
+public class AdvancedForm {
+	/**
+	 * 看一下具体内容你就懂了，傻逼都能看懂，不多说
+	 */
+	public enum FormSizeState {
+		Minimize, Normal, Maximize
+	};
+
+	private JFrame JFRM;
+	private Dimension ScreenSize;
+	private Insets ScreenInsets;
+	private FormSizeState FRMSize = FormSizeState.Normal;
+	private boolean EdgeResize = false;
+
+	private int Mouse_OnFRM_X = 0, Mouse_OnFRM_Y = 0;
+	private int Mouse_OnScreen_X = 0, Mouse_OnScreen_Y = 0;
+	private int FRMNormal_Size_X = 0, FRMNormal_Size_Y = 0;
+	private int FRMNormal_Location_X = 0, FRMNormal_Location_Y = 0;
+
+	/**
+	 * 激活本插件
+	 * 
+	 * @param Form
+	 *            欲实现功能的窗体
+	 */
+	public AdvancedForm(JFrame Form) {
+		this.JFRM = Form;
+		RegetScreenSize();
+		RegetScreenInsets();
+	}
+
+	/**
+	 * 激活本插件
+	 * 
+	 * @param Form
+	 *            欲实现功能的窗体
+	 * @param TitleBar
+	 *            想要当作标题栏的控件
+	 */
+	public AdvancedForm(JFrame Form, JComponent TitleBar) {
+		this.JFRM = Form;
+		TitleBar.addMouseListener(MApt_DragMove);
+		TitleBar.addMouseMotionListener(MMApt_DragMove);
+		RegetScreenSize();
+		RegetScreenInsets();
+	}
+
+	MouseAdapter MApt_DragMove = new MouseAdapter() {
+		@Override
+		public void mousePressed(MouseEvent e) {
+			RegetScreenSize();
+			RegetScreenInsets();
+			Mouse_OnFRM_X = e.getX();
+			Mouse_OnFRM_Y = e.getY();
+		}
+
+		@Override
+		public void mouseReleased(MouseEvent e) {
+			// 如果开着边缘缩放，则允许触发事件
+			if (EdgeResize && FRMSize == FormSizeState.Normal) {
+				// 触发最大化
+				if (Mouse_OnScreen_Y == ScreenInsets.top) {
+					Set_FormSizeState(FormSizeState.Maximize);
+				}
+				// 触发左半屏
+				if (Mouse_OnScreen_X <= ScreenInsets.left) {
+					FRM_HalfScreen_Lift();
+				}
+				// 触发右半屏
+				if (Mouse_OnScreen_X >= ScreenSize.width - ScreenInsets.right - 1) {
+					FRM_HalfScreen_Right();
+				}
+			}
+		}
+
+		@Override
+		public void mouseClicked(MouseEvent e) {
+			// 如果想调试，用Debug版方法，那个方法会出控制台信息
+			super.IsItDoubleClick(e);
+			// super.IsItDoubleClick_Debug(e);
+		}
+
+		@Override
+		public void mouseDoubleClicked(MouseEvent e) {
+			// 如果双击，则在正常与最大化之间循环切换
+			if (Get_FormSizeState() == FormSizeState.Normal) {
+				Set_FormSizeState(FormSizeState.Maximize);
+			} else if (Get_FormSizeState() == FormSizeState.Maximize) {
+				FRM_RestoreNormalSize();
+			}
+		}
+	};
+
+	MouseMotionAdapter MMApt_DragMove = new MouseMotionAdapter() {
+		@Override
+		public void mouseDragged(MouseEvent e) {
+			// 允许拖动的情况：窗口正常或者最大化并开着边缘缩放(会触发还原)
+			if (Get_FormSizeState() == FormSizeState.Normal
+					|| (Get_FormSizeState() == FormSizeState.Maximize && EdgeResize)) {
+				Mouse_OnScreen_X = e.getXOnScreen();
+				Mouse_OnScreen_Y = e.getYOnScreen();
+				FRMNormal_Location_X = Mouse_OnScreen_X - Mouse_OnFRM_X;
+				FRMNormal_Location_Y = Mouse_OnScreen_Y - Mouse_OnFRM_Y;
+				if (FRMNormal_Location_Y < ScreenInsets.top) {
+					FRMNormal_Location_Y = ScreenInsets.top;
+				}
+				// 开着拖拽缩放的时候去拽一个最大化的窗口，则触发还原
+				if (FRMNormal_Location_Y > ScreenInsets.top && Get_FormSizeState() == FormSizeState.Maximize
+						&& EdgeResize) {
+					double MouseDragAtPer = (double) Mouse_OnFRM_X / JFRM.getWidth();
+					System.out.println(Mouse_OnFRM_X + ":" + JFRM.getWidth());
+					System.out.println("拖拽于标题栏" + MouseDragAtPer + "处");
+					System.out.println(FRMNormal_Size_X * MouseDragAtPer + ":" + FRMNormal_Size_X);
+					Set_FormSizeState(FormSizeState.Normal);
+					FRMNormal_Location_X = Mouse_OnScreen_X - (int) (FRMNormal_Size_X * MouseDragAtPer);
+					System.out.println(FRMNormal_Location_X);
+				}
+				JFRM.setLocation(FRMNormal_Location_X, FRMNormal_Location_Y);
+			}
+		}
+	};
+
+	/**
+	 * 开关仿Win7的拖动到边缘缩放
+	 * 
+	 * @param Enable
+	 *            【￣^￣】自己猜！
+	 */
+	public void Set_EdgeResize(boolean Enable) {
+		EdgeResize = Enable;
+	}
+
+	/**
+	 * 确认仿Win7的拖动到边缘缩放
+	 * 
+	 * @return 【￣^￣】自己猜！
+	 */
+	public boolean Get_EdgeResize() {
+		return EdgeResize;
+	}
+
+	/**
+	 * 刷新缓存的屏幕大小数据
+	 */
+	public void RegetScreenSize() {
+		ScreenSize = Toolkit.getDefaultToolkit().getScreenSize();
+	}
+
+	/**
+	 * 刷新缓存的屏幕可用空间数据【会自动刨掉那些任务栏之类的“死”空间】
+	 */
+	public void RegetScreenInsets() {
+		ScreenInsets = Toolkit.getDefaultToolkit().getScreenInsets(JFRM.getGraphicsConfiguration());
+	}
+
+	/**
+	 * 获取窗体目前状态
+	 * 
+	 * @return 【￣^￣】你猜
+	 */
+	public FormSizeState Get_FormSizeState() {
+		return FRMSize;
+	}
+
+	/**
+	 * 设定窗体状态
+	 * 
+	 * @param State
+	 *            你继续猜【￣^￣】
+	 */
+	public void Set_FormSizeState(FormSizeState State) {
+		RegetScreenSize();
+		RegetScreenInsets();
+		switch (State) {
+		case Maximize:
+			FRMNormal_Size_X = JFRM.getWidth();
+			FRMNormal_Size_Y = JFRM.getHeight();
+			FRMNormal_Location_X = JFRM.getX();
+			FRMNormal_Location_Y = JFRM.getY();
+			System.out.println("窗口最大化");
+			JFRM.setResizable(false);
+			JFRM.setLocation(ScreenInsets.left, ScreenInsets.top);
+			JFRM.setSize(ScreenSize.width - ScreenInsets.left - ScreenInsets.right,
+					ScreenSize.height - ScreenInsets.top - ScreenInsets.bottom);
+			FRMSize = FormSizeState.Maximize;
+			break;
+
+		case Normal:
+			System.out.println("窗口还原");
+			JFRM.setResizable(true);
+			JFRM.setSize(FRMNormal_Size_X, FRMNormal_Size_Y);
+			FRMSize = FormSizeState.Normal;
+		}
+
+	}
+
+	/**
+	 * 还原(Set_FormSizeState默认不还原窗口位置，这个是同时还原位置和大小的版本，等于按右上角的还原钮)
+	 */
+	public void FRM_RestoreNormalSize() {
+		Set_FormSizeState(FormSizeState.Normal);
+		JFRM.setLocation(FRMNormal_Location_X, FRMNormal_Location_Y);
+	}
+
+	/**
+	 * 左半屏
+	 */
+	public void FRM_HalfScreen_Lift() {
+		Set_FormSizeState(FormSizeState.Normal);
+		JFRM.setLocation(ScreenInsets.left, ScreenInsets.top);
+		JFRM.setSize((ScreenSize.width - ScreenInsets.left - ScreenInsets.right) / 2,
+				ScreenSize.height - ScreenInsets.top - ScreenInsets.bottom);
+	}
+
+	/**
+	 * 右半屏
+	 */
+	public void FRM_HalfScreen_Right() {
+		Set_FormSizeState(FormSizeState.Normal);
+		JFRM.setLocation((ScreenSize.width - ScreenInsets.left - ScreenInsets.right) / 2 + ScreenInsets.left,
+				ScreenInsets.top);
+		JFRM.setSize((ScreenSize.width - ScreenInsets.left - ScreenInsets.right) / 2,
+				ScreenSize.height - ScreenInsets.top - ScreenInsets.bottom);
+	}
+
+}
